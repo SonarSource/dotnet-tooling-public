@@ -1,0 +1,74 @@
+name: '[renovate] Update NuGet Package Lock JSON'
+
+on:
+  workflow_call:
+    inputs:
+      projects:
+        description: 'Newline-separated list of PROJECT|SOLUTION paths to restore'
+        required: true
+        type: string
+      prNumber:
+        description: 'PR number to update lock files for (optional, for manual dispatch)'
+        required: false
+        type: number
+        default: 0
+
+jobs:
+  update-lock-files:
+    name: Update NuGet Package Lock Files
+    runs-on: warp-custom-dotnet-bubble-ci
+    defaults:
+      run:
+        shell: pwsh
+    permissions:
+      id-token: write
+      pull-requests: read
+    steps:
+      - name: Get branch ref
+        id: branch-ref
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const ref = ${{ inputs.prNumber || 0 }}
+              ? (await github.rest.pulls.get({
+                  ...context.repo,
+                  pull_number: ${{ inputs.prNumber || 0 }}
+                })).data.head.ref
+              : context.ref;
+            core.setOutput('ref', ref);
+
+      # Vault token is used because built-in GITHUB_TOKEN doesn't trigger CI
+      - name: Get secrets
+        id: secrets
+        uses: SonarSource/vault-action-wrapper@v3
+        with:
+          secrets: |
+            development/github/token/{REPO_OWNER_NAME_DASH}-nuget-lock-update token | GITHUB_TOKEN;
+            development/artifactory/token/{REPO_OWNER_NAME_DASH}-private-reader username | ARTIFACTORY_USERNAME;
+            development/artifactory/token/{REPO_OWNER_NAME_DASH}-private-reader access_token | ARTIFACTORY_ACCESS_TOKEN;
+
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ steps.branch-ref.outputs.ref }}
+          token: ${{ fromJSON(steps.secrets.outputs.vault).GITHUB_TOKEN }}
+
+      - name: Restore NuGet packages with force-evaluate
+        env:
+          ARTIFACTORY_USER: ${{ fromJSON(steps.secrets.outputs.vault).ARTIFACTORY_USERNAME }}
+          ARTIFACTORY_PASSWORD: ${{ fromJSON(steps.secrets.outputs.vault).ARTIFACTORY_ACCESS_TOKEN }}
+          PROJECTS: ${{ inputs.projects }}
+        run: |
+          foreach ($project in ($env:PROJECTS -split "`n" | Where-Object { $_ })) {
+            Write-Host "Restoring $project"
+            dotnet restore $project --force-evaluate
+          }
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet; if ($LASTEXITCODE -eq 0) { exit 0 }
+          git commit -m "Update NuGet package lock files"
+          git push
