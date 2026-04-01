@@ -17,6 +17,9 @@ jobs:
   update-lock-files:
     name: Update NuGet Package Lock Files
     runs-on: warp-custom-dotnet-bubble-ci
+    defaults:
+      run:
+        shell: pwsh
     permissions:
       id-token: write
       pull-requests: read
