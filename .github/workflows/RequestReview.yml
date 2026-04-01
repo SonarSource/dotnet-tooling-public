@@ -7,7 +7,7 @@ on:
 jobs:
   RequestReview_job:
     name: Request review
-    runs-on: sonar-xs
+    runs-on: github-ubuntu-latest-s
     permissions:
       id-token: write
     # For external PR, ticket should be moved manually
@@ -15,13 +15,13 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - id: secrets
-        uses: SonarSource/vault-action-wrapper@v3
+        uses: SonarSource/vault-action-wrapper@c154b4a417b51cb98dd71137f49bf20e77c56820 # v3.4.0
         with:
           secrets: |
             development/github/token/{REPO_OWNER_NAME_DASH}-jira token | GITHUB_TOKEN;
             development/kv/data/jira user | JIRA_USER;
             development/kv/data/jira token | JIRA_TOKEN;
-      - uses: sonarsource/gh-action-lt-backlog/RequestReview@v2
+      - uses: sonarsource/gh-action-lt-backlog/RequestReview@61e3325bb82cda901f8f7f69a5d5e5dedf713baa # v2
         with:
           github-token: ${{ fromJSON(steps.secrets.outputs.vault).GITHUB_TOKEN }}
           jira-user:    ${{ fromJSON(steps.secrets.outputs.vault).JIRA_USER }}
