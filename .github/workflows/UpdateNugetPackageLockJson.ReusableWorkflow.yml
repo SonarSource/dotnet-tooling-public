@@ -61,9 +61,17 @@ jobs:
           ARTIFACTORY_PASSWORD: ${{ fromJSON(steps.secrets.outputs.vault).ARTIFACTORY_ACCESS_TOKEN }}
           PROJECTS: ${{ inputs.projects }}
         run: |
+          $failed = @()
           foreach ($project in ($env:PROJECTS -split "`n" | Where-Object { $_ })) {
             Write-Host "Restoring $project"
             dotnet restore $project --force-evaluate
+            if ($LASTEXITCODE -ne 0) {
+              $failed += $project
+            }
+          }
+          if ($failed.Count -gt 0) {
+            Write-Host "##[error]Restore failed for: $($failed -join ', ')"
+            exit 1
           }
 
       - name: Commit and push changes
