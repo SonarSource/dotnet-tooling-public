@@ -12,6 +12,11 @@ on:
         required: false
         type: number
         default: 0
+      commitMessagePrefix:
+        description: 'Optional prefix for the commit message (e.g., "[skip-ci] ")'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   update-lock-files:
@@ -67,5 +72,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --quiet; if ($LASTEXITCODE -eq 0) { exit 0 }
-          git commit -m "Update NuGet package lock files"
+          git commit -m "${{ inputs.commitMessagePrefix }}Update NuGet package lock files"
           git push
